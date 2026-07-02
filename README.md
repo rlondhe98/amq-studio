@@ -107,21 +107,6 @@ Access the dashboard at: **[AMQ Studio](https://amq-studio-peywsb.5sc6y6-4.usa-e
 
 ---
 
-## Configuration
-
-Key settings you can adjust:
-
-| Setting | Default | What It Controls |
-|---------|---------|-----------------|
-| HTTP Port | `8081` | Port the dashboard runs on |
-| ACK Timeout | `5 min` | How long before unacknowledged messages return to queue |
-| Max Messages | `10,000` | Maximum messages consumed per session |
-| Lock Timeout | `10 min` | How long before an idle session is considered stale |
-| Session TTL | `1 hour` | How long an authenticated session lasts |
-| Manual Form | `enabled` | Show/hide the manual access form (PoC only) |
-
----
-
 ## Compared to Anypoint MQ REM
 
 | Feature | REM | AMQ Studio |
@@ -140,17 +125,6 @@ Key settings you can adjust:
 | Real-time progressive streaming | ❌ | ✅ |
 | AES-256 encrypted sessions | ❌ | ✅ |
 | Dynamic platform integration | ❌ | ✅ |
-
----
-
-## Roadmap
-
-- [ ] SSO Login — "Login with MuleSoft" button via OAuth 2.0
-- [ ] Analytics Dashboard — Message volume trends, queue health monitoring
-- [ ] DLQ Workflows — Bulk replay, dead-letter-specific views
-- [ ] Error Intelligence — Track retry patterns, identify recurring failures
-- [ ] Dark Mode & Mobile — Responsive design, keyboard shortcuts
-- [ ] Remove manual form at GA
 
 ---
 
