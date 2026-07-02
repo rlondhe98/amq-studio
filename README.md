@@ -103,6 +103,16 @@ Security is built into every layer:
 ## Getting Started
 
 ### Create a connected app in your mulesoft environment which has read permissions on Organizations, environments, regions and AnypointMQs
+
+### Runtime Properties
+
+The following runtime properties must be set when deploying the application:
+
+| Property | Value | Description |
+|----------|-------|-------------|
+| `KEYSTORE_PASSWORD` | `<Your own password>` | Password for the RSA keystore used to encrypt credentials |
+| `app.testModeEnabled` | `false` | Set to `false` to remove the manual form toggle (Platform-led login only) |
+
 Access the dashboard at: **[AMQ Studio](https://amq-studio-peywsb.5sc6y6-4.usa-e2.cloudhub.io/amq-studio)**
 
 ---
