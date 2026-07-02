@@ -102,25 +102,7 @@ Security is built into every layer:
 
 ## Getting Started
 
-### 1. Clone & Configure
-
-```bash
-git clone <repository-url>
-cd amq-studio
-```
-
-Configure the application properties for your environment (HTTP port, queue timeouts, lock thresholds, etc.) in the environment YAML file.
-
-### 2. Build
-
-```bash
-mvn clean package -DskipTests
-```
-
-### 3. Run
-
-Open in Anypoint Studio and run, or deploy to CloudHub.
-
+### Create a connected app in your mulesoft environment which has read permissions on Organizations, environments, regions and AnypointMQs
 Access the dashboard at: **[AMQ Studio](https://amq-studio-peywsb.5sc6y6-4.usa-e2.cloudhub.io/amq-studio)**
 
 ---
