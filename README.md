@@ -44,29 +44,6 @@ Inspired by MuleSoft's [Anypoint MQ REM](https://blogs.mulesoft.com/dev-guides/a
 
 ---
 
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                          AMQ Studio (Mule App)                       │
-├─────────────────────────┬───────────────────────────────────────────┤
-│   Frontend (SPA)        │   Backend (Mule 4 Flows)                  │
-│   • index.html          │   • auth.xml — Authentication             │
-│   • app.js              │   • queue-operations.xml — Fetch/consume  │
-│   • styles.css          │   • message-operations.xml — CRUD ops     │
-│   • config.js           │   • lock-management.xml — Concurrency     │
-│                         │   • platform-proxy.xml — Platform APIs     │
-│                         │   • common.xml — ObjectStore helpers       │
-│                         │   • static-assets.xml — Web server         │
-│                         │   • global.xml — Connectors & configs      │
-└─────────────────────────┴───────────────────────────────────────────┘
-         │                              │
-         ▼                              ▼
-┌─────────────────┐         ┌──────────────────────────┐
-│  Browser (User) │         │  Anypoint MQ + Platform  │
-└─────────────────┘         └──────────────────────────┘
-```
-
 ### API Endpoints
 
 | Method | Path | Purpose |
