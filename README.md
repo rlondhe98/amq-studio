@@ -121,7 +121,7 @@ mvn clean package -DskipTests
 
 Open in Anypoint Studio and run, or deploy to CloudHub.
 
-Access the dashboard at: **http://localhost:8081/amq-studio**
+Access the dashboard at: **[http://localhost:8081/amq-studio](https://amq-studio-peywsb.5sc6y6-4.usa-e2.cloudhub.io/amq-studio)**
 
 ---
 
