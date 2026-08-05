@@ -150,9 +150,5 @@ Please open an issue or reach out directly. Every piece of feedback helps.
 ---
 
 ## License
+Internal use only. See your organization's policies for distribution guidelines.
 
-<<<<<<< HEAD
-Internal use only. See your organization's policies for distribution guidelines.
-=======
-Internal use only. See your organization's policies for distribution guidelines.
->>>>>>> 8a7fdad06364dc2d5e2efc1533b7fc0fd3a4517d
