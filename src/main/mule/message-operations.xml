@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:anypoint-mq="http://www.mulesoft.org/schema/mule/anypoint-mq"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/anypoint-mq http://www.mulesoft.org/schema/mule/anypoint-mq/current/mule-anypoint-mq.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	<flow name="pf-fetch-and-store-all-messages-from-fifo-queue-impl" doc:id="89f9c616-5fbc-46ac-8146-8ec20c146b98" >
+		<http:listener doc:name="Fetch and store all messages to OS" doc:id="39528fe9-d68e-4ba1-9fae-c51d6d7018e8" config-ref="HTTP_Listener_config" path="/fetch-all-messages" allowedMethods="GET"/>
+		<flow-ref doc:name="Resolve AMQ Credentials" name="sf-resolve-amq-credentials" />
+		<ee:transform doc:name="Set Anypoint MQ Params" doc:id="1375753c-ce60-4a20-91ae-58452100175e" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="amqConfig" ><![CDATA[%dw 2.0
+output application/java
+var queryParams = attributes.queryParams
+var headers = attributes.headers
+var mqUrl = if(isEmpty(vars.amqConfig.mqUrl)) Mule::p('anypointMQ.url') replace "{region}" with headers.region replace "{orgId}" with headers.orgId replace "{envId}" with headers.envId else ""
+---
+{
+	"orgId": if(!isEmpty(vars.amqConfig.orgId)) vars.amqConfig.orgId else headers.orgId,
+	"envId": if(!isEmpty(vars.amqConfig.envId)) vars.amqConfig.envId else headers.envId,
+	"mqUrl": if(!isEmpty(vars.amqConfig.mqUrl)) vars.amqConfig.mqUrl else mqUrl,
+	"amqClientId": if(!isEmpty(vars.amqConfig.amqClientId)) vars.amqConfig.amqClientId else vars.resolvedAmqClientId,
+	"amqClientSecret": if(!isEmpty(vars.amqConfig.amqClientSecret)) vars.amqConfig.amqClientSecret else vars.resolvedAmqClientSecret,
+	"queueName": if(!isEmpty(vars.amqConfig.queueName)) vars.amqConfig.queueName else queryParams.queueName,
+	"count": if(!isEmpty(vars.amqConfig.count)) vars.amqConfig.count else 0
+}]]></ee:set-variable>
+				<ee:set-variable variableName="sequence" ><![CDATA[%dw 2.0
+output application/java
+---
+0]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+        <try doc:name="Try" doc:id="pjbsyq">
+      <foreach doc:name="Foreach" doc:id="znjyit" collection="#[(1 to Mule::p('anypointMQ.maxMessages') as Number)]">
+            <anypoint-mq:consume doc:name="Consume" doc:id="oszukn" config-ref="Anypoint_MQ_Config" destination="#[vars.amqConfig.queueName]" acknowledgementTimeout="${anypointMQ.consume.acknowledgementTimeout}" acknowledgementTimeoutUnit="MINUTES" acknowledgementMode="MANUAL" pollingTime="${anypointMQ.consume.pollingTime}" pollingTimeUnit="SECONDS"/>
+            <ee:transform doc:name="Response" doc:id="oihukp">
+            			<ee:message>
+            			</ee:message>
+            			<ee:variables>
+            				<ee:set-variable variableName="mqAttributes"><![CDATA[%dw 2.0
+output application/json
+---
+attributes]]></ee:set-variable>
+            				<ee:set-variable variableName="mqData"><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-variable>
+            				<ee:set-variable variableName="mqContentType"><![CDATA[%dw 2.0
+var rawCt = (attributes.properties.contentType default message.dataType.mimeType) default "application/json"
+var baseCt = trim((rawCt splitBy ";")[0])
+output application/java
+---
+if(baseCt == "text/csv") "application/csv" else baseCt]]></ee:set-variable>
+            				<ee:set-variable variableName="userProperties"><![CDATA[%dw 2.0
+output application/json
+---
+attributes.properties]]></ee:set-variable>
+            					<ee:set-variable variableName="sequence" ><![CDATA[%dw 2.0
+output application/json
+---
+(vars.sequence default 0) + 1]]></ee:set-variable>
+            			</ee:variables>
+            		</ee:transform>
+            <flow-ref doc:name="Store message in OS" doc:id="sfdsbf" name="sf-store-in-os-impl" />
+            <anypoint-mq:ack doc:name="Ack" doc:id="osmmtl" config-ref="Anypoint_MQ_Config" ackToken="#[vars.mqAttributes.ackToken]" />
+        <ee:transform doc:name="Update message count" doc:id="dcejvy">
+        					<ee:message>
+        					</ee:message>
+        					<ee:variables >
+        						<ee:set-variable variableName="amqConfig" ><![CDATA[%dw 2.0
+        output application/java
+        ---
+        vars.amqConfig update {
+        	case .count -> $ + 1
+        }]]></ee:set-variable>
+        					</ee:variables>
+        				</ee:transform>
+              </foreach>
+      <error-handler>
+          <on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="tulmjs" when="#[error.description contains &quot;Failed to retrieve a Message. Didn't receive any message&quot;]">
+                              <set-variable value="#[true]" doc:name="endOfMessage" doc:id="tdipjo" variableName="endOfMessage"/>
+                          </on-error-continue>
+      </error-handler>
+        </try>
+    <ee:transform doc:name="Response" doc:id="ddwzar" >
+    					<ee:message >
+    						<ee:set-payload ><![CDATA[%dw 2.0
+    output application/json
+    ---
+    {
+    	"message": "All messages read successfully.",
+    	"noOfMessages": vars.amqConfig.count
+    }]]></ee:set-payload>
+    					</ee:message>
+    				</ee:transform>
+	</flow>
+	<flow name="pf-list-all-messages-impl" doc:id="498e931d-f396-4a88-aa74-11382dc975e7" >
+		<http:listener doc:name="List all messages" doc:id="c2d222df-405d-4694-9442-abe4be1baf8c" config-ref="HTTP_Listener_config" path="/list-all-messages" allowedMethods="GET"/>
+		<ee:transform doc:name="Set incoming params" doc:id="f592d717-985b-408b-b5d1-72d5df864a6e" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="osAttributes" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	"orgId": attributes.headers.orgId,
+	"envId": attributes.headers.envId,
+	"queueName": attributes.queryParams.queueName
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="List all keys" doc:id="7129ad65-37b8-4222-a513-07b52e343a2f" name="sf-retrieve-all-keys-impl"/>
+		<choice doc:name="Choice" doc:id="hppmya">
+		<when doc:name="When" expression="#[!isEmpty(payload) and (sizeOf(payload default []) &gt; 0)]">
+				<parallel-foreach doc:name="Parallel For Each" doc:id="6e849709-55ef-4cbd-8a48-bbbb167501f2" collection="#[payload]">
+					<ee:transform doc:name="Set params" doc:id="3aac1877-552e-481c-b60d-b08bd86906a3" >
+						<ee:message >
+						</ee:message>
+						<ee:variables >
+							<ee:set-variable variableName="keyAvailable" ><![CDATA[%dw 2.0
+output application/json
+---
+true]]></ee:set-variable>
+							<ee:set-variable variableName="osKey" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+							<ee:set-variable variableName="messageId" ><![CDATA[%dw 2.0
+output application/json
+---
+(payload splitBy "_")[3]]]></ee:set-variable>
+						</ee:variables>
+					</ee:transform>
+					<flow-ref doc:name="Retrieve a single key" doc:id="0a67c44e-2d35-42b4-b913-616922631f27" name="sf-retrieve-single-key-impl" />
+					<ee:transform doc:name="Aggregate payload" doc:id="c4862d4d-34d3-4019-825a-a3b6afb2b507" >
+						<ee:message >
+							<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+((payload default {}) ++ {messageId: vars.messageId})]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+				</parallel-foreach>
+			</when></choice>
+		<ee:transform doc:name="Response" doc:id="79e68cf6-9ba0-46fd-bf87-ea854e4d1234" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.payload orderBy $.sequence]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="pf-fetch-single-message-impl" doc:id="3d03b54e-9f7a-4112-a2a1-25e9194ea1b0" >
+		<http:listener doc:name="List all messages" doc:id="e4f19c53-c699-49f4-93a8-e8a3f4a92c15" config-ref="HTTP_Listener_config" path="/list-message/{messageId}" allowedMethods="GET" />
+		<ee:transform doc:name="Set incoming params" doc:id="3f4f409a-0621-4d7a-b7ad-c74a7ea06cb1" >
+			<ee:message />
+			<ee:variables >
+				<ee:set-variable variableName="osAttributes" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	"orgId": attributes.headers.orgId,
+	"envId": attributes.headers.envId,
+	"queueName": attributes.queryParams.queueName,
+	"messageId": attributes.uriParams.messageId
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Retrieve key" doc:id="6ce3260e-25a6-4fe2-a6fe-c935c2f3a5bc" name="sf-retrieve-single-key-impl"/>
+		<ee:transform doc:name="Response" doc:id="945728f3-8156-4b1b-bbbe-5ef6ccd722b4" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="pf-delete-messages-impl" doc:id="del-flow-0001" >
+		<http:listener doc:name="Delete messages" doc:id="del-listener-0001" config-ref="HTTP_Listener_config" path="/delete-messages" allowedMethods="DELETE"/>
+		<ee:transform doc:name="Set params" doc:id="del-transform-0001">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="osAttributes"><![CDATA[%dw 2.0
+output application/java
+---
+{
+	"orgId": attributes.headers.orgId,
+	"envId": attributes.headers.envId,
+	"queueName": payload.sourceQueue
+}]]></ee:set-variable>
+				<ee:set-variable variableName="messageIdList"><![CDATA[%dw 2.0
+output application/java
+---
+payload.messageIdList default []]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each message to delete" doc:id="del-foreach-0001" collection="#[vars.messageIdList]">
+			<set-variable value="#[true]" doc:name="Key available" doc:id="del-setkey-0001" variableName="keyAvailable" />
+			<set-variable value='#[[vars.osAttributes.orgId, vars.osAttributes.envId, vars.osAttributes.queueName, payload] joinBy "_"]' doc:name="OS Key" doc:id="del-setoskey-0001" variableName="osKey" />
+			<flow-ref doc:name="Delete key from OS" doc:id="del-flowref-0001" name="sf-delete-key-from-os-impl" />
+		</foreach>
+		<ee:transform doc:name="Response" doc:id="del-response-0001">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Successfully deleted " ++ (sizeOf(vars.messageIdList default []) as String) ++ " message(s)."
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="pf-update-message-impl" doc:id="update-flow-0001" >
+		<http:listener doc:name="Update message" doc:id="update-listener-0001" config-ref="HTTP_Listener_config" path="/update-message" allowedMethods="PUT"/>
+		<ee:transform doc:name="Set params" doc:id="update-transform-0001">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="osKey"><![CDATA[%dw 2.0
+output application/java
+---
+[attributes.headers.orgId, attributes.headers.envId, payload.queueName, payload.messageId] joinBy "_"]]></ee:set-variable>
+				<ee:set-variable variableName="updatedData"><![CDATA[%dw 2.0
+output application/java
+---
+payload.data]]></ee:set-variable>
+				<ee:set-variable variableName="updatedUserProperties"><![CDATA[%dw 2.0
+output application/java
+---
+payload.userProperties]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<os:retrieve doc:name="Retrieve existing" doc:id="update-retrieve-0001" key="#[vars.osKey]" objectStore="AMQ_Object_store" target="existingMsg">
+			<os:default-value><![CDATA[#[{}]]]></os:default-value>
+		</os:retrieve>
+		<os:remove doc:name="Remove old" doc:id="update-remove-0001" key="#[vars.osKey]" objectStore="AMQ_Object_store"/>
+		<os:store doc:name="Store updated" doc:id="update-store-0001" key="#[vars.osKey]" objectStore="AMQ_Object_store">
+			<os:value><![CDATA[#[output application/java --- {
+	"data": vars.updatedData,
+	"contentType": vars.existingMsg.contentType default "application/json",
+	"userProperties": vars.updatedUserProperties,
+	"sequence": vars.existingMsg.sequence,
+	"created": vars.existingMsg.created
+}]]]></os:value>
+		</os:store>
+		<ee:transform doc:name="Response" doc:id="update-response-0001">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Message updated successfully."
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>

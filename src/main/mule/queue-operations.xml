@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:anypoint-mq="http://www.mulesoft.org/schema/mule/anypoint-mq"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/anypoint-mq http://www.mulesoft.org/schema/mule/anypoint-mq/current/mule-anypoint-mq.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	<flow name="pf-send-messages-to-queue-impl" doc:id="1ebb5c24-0826-48b5-88ba-0bf4bcf31123" >
+		<http:listener doc:name="Return messages to queue" doc:id="8ea5e452-1418-4edf-b4dc-b34361d6c7ea" config-ref="HTTP_Listener_config" path="/send-to-queue" allowedMethods="PUT" >
+			<http:response statusCode="#[vars.httpStatus default 200]" />
+			<http:error-response statusCode="#[vars.httpStatus default 500]" />
+		</http:listener>
+		<flow-ref doc:name="Resolve AMQ Credentials" name="sf-resolve-amq-credentials" />
+		<ee:transform doc:name="Set incoming params" doc:id="eedce1c0-7d29-4448-a9db-5ac928f9a75f" >
+			<ee:message />
+			<ee:variables >
+				<ee:set-variable variableName="messages" ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+				<ee:set-variable variableName="amqConfig" ><![CDATA[%dw 2.0
+output application/java
+var queryParams = attributes.queryParams
+var headers = attributes.headers
+var mqUrl = if(isEmpty(vars.amqConfig.mqUrl)) Mule::p('anypointMQ.url') replace "{region}" with headers.region replace "{orgId}" with headers.orgId replace "{envId}" with headers.envId else ""
+var queueName = payload.transaction match {
+					case "RTO" -> payload.sourceQueue
+					case "TMQ" -> payload.targetQueue
+					else -> ""
+				}
+---
+{
+	"orgId": headers.orgId,
+	"envId": headers.envId,
+	"mqUrl": mqUrl,
+	"transaction": payload.transaction,
+	"amqClientId": vars.resolvedAmqClientId,
+	"amqClientSecret": vars.resolvedAmqClientSecret,
+	"queueName": queueName,
+	"sourceQueue": payload.sourceQueue,
+	"targetQueue": payload.targetQueue
+}]]></ee:set-variable>
+				<ee:set-variable variableName="osAttributes" ><![CDATA[%dw 2.0
+output application/java
+var queryParams = attributes.queryParams
+var headers = attributes.headers
+var allMessages = payload.allMessages default false
+---
+{
+	"orgId": headers.orgId,
+	"envId": headers.envId,
+	"queueName": payload.sourceQueue,
+	"allMessages": allMessages,
+	"messageIdList": if(!allMessages) payload.messageIdList else null
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<choice doc:name="All messages or single?" doc:id="894d3ce1-6c2a-445a-82a2-94c1d7d02075" >
+			<when expression="#[vars.osAttributes.allMessages]">
+				<flow-ref doc:name="Fetch all keys" doc:id="9341b0bf-a3e2-4f8a-a95d-959a852828a1" name="sf-retrieve-all-keys-impl" />
+				<choice doc:name="Messages available?" doc:id="32b08a91-b647-432a-8cbe-5ad205421500">
+					<when expression="#[sizeOf(payload default []) &gt; 0]">
+						<foreach doc:name="For Each" doc:id="6fb05d0b-587c-49ab-8ca3-a5b78b44885f" collection="#[payload]">
+			<set-variable value="#[true]" doc:name="Key available?" doc:id="b15f0f32-ab05-4ddc-8292-944f7bbd3013" variableName="keyAvailable" />
+					<set-variable value="#[payload]" doc:name="OS Key name" doc:id="2e7cc09b-7631-42a3-b503-696f8c0358fb" variableName="osKey" />
+					<flow-ref doc:name="Retrieve a single key" doc:id="81ec5dfc-9cfe-4a5c-8ff3-dbd8caf1e4cf" name="sf-retrieve-single-key-impl" />
+					<ee:transform doc:name="Aggregate messages" doc:id="dfac3b64-326c-45fe-836a-7b8e1047489b">
+						<ee:message>
+						</ee:message>
+						<ee:variables>
+							<ee:set-variable variableName="messages"><![CDATA[%dw 2.0
+output application/java
+---
+(vars.messages default []) + payload]]></ee:set-variable>
+						</ee:variables>
+					</ee:transform>
+							<flow-ref doc:name="Delete key from OS" doc:id="61f2ae19-a074-4bdb-8493-cfa5782997ee" name="sf-delete-key-from-os-impl" />
+		</foreach>
+						<foreach doc:name="For Each message" doc:id="cacbbeb0-28cb-4f7d-9d11-5548d9cc3d49" collection="#[vars.messages orderBy $.sequence]">
+			<anypoint-mq:publish doc:name="Publish" doc:id="2653aafb-59cb-4f84-b0ef-1e3283329598" config-ref="Anypoint_MQ_Config" destination='#[vars.amqConfig.queueName]'>
+								<anypoint-mq:body ><![CDATA[#[%dw 2.0
+var baseCt = trim(((payload.contentType default "application/json") splitBy ";")[0])
+var ct = if(baseCt == "text/csv") "application/csv" else baseCt
+output application/java
+---
+if(payload.data is String) payload.data
+else write(payload.data default "", ct)]]]></anypoint-mq:body>
+								<anypoint-mq:properties ><![CDATA[#[output application/java --- (payload.userProperties default {}) ++ {"contentType": payload.contentType default "application/json"}]]]></anypoint-mq:properties>
+							</anypoint-mq:publish>
+		</foreach>
+						<ee:transform doc:name="Response" doc:id="a2d1d6e0-ccbb-42cb-9d1b-02e5700700af">
+								<ee:message>
+									<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var message = vars.amqConfig.transaction match {
+				case "RTO" -> "Returned all messages to source queue: " ++ (vars.amqConfig.queueName default "")
+				case "TMQ" -> "Published all messages from " ++ (vars.amqConfig.sourceQueue default "") ++ " to " ++ (vars.amqConfig.targetQueue default "")
+			}
+---
+{
+	"message": message
+}]]></ee:set-payload>
+								</ee:message>
+							</ee:transform>
+					</when>
+					<otherwise >
+						<ee:transform doc:name="Transform Message" doc:id="2303f8d4-d36d-4333-a936-6d8669237987">
+							<ee:message>
+								<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "No messages available to publish to source queue"
+}]]></ee:set-payload>
+							</ee:message>
+						</ee:transform>
+						<logger level="INFO" doc:name="No messages available" doc:id="388582f2-ae91-4241-bf2b-a13340ad4f79" message="#[payload]"/>
+					</otherwise>
+				</choice>
+			</when>
+			<when expression="#[!(vars.osAttributes.allMessages default false) and (sizeOf(vars.osAttributes.messageIdList default []) &gt; 0)]">
+				<foreach doc:name="For Each" doc:id="9f281c86-b468-44c6-9ca2-3ec09da41538" collection="#[vars.osAttributes.messageIdList]">
+					<set-variable value="#[true]" doc:name="Key available?" doc:id="f443086d-b99d-4bf0-b215-12d246655b49" variableName="keyAvailable" />
+					<set-variable value='#[[vars.osAttributes.orgId, vars.osAttributes.envId, vars.osAttributes.queueName, payload] joinBy "_"]' doc:name="OS Key name" doc:id="30afd63b-9b1a-4d1d-aa18-8fd01db935e3" variableName="osKey" />
+					<flow-ref doc:name="Retrieve a single key" doc:id="1a00cb54-15ce-45c6-ac99-84e86d99c6f7" name="sf-retrieve-single-key-impl" />
+					<anypoint-mq:publish doc:name="Publish" doc:id="81e1f397-033d-4584-a53b-83886f143071" config-ref="Anypoint_MQ_Config" destination="#[vars.amqConfig.queueName]">
+					<anypoint-mq:body><![CDATA[#[%dw 2.0
+var baseCt = trim(((payload.contentType default "application/json") splitBy ";")[0])
+var ct = if(baseCt == "text/csv") "application/csv" else baseCt
+output application/java
+---
+if(payload.data is String) payload.data
+else write(payload.data default "", ct)]]]></anypoint-mq:body>
+					<anypoint-mq:properties><![CDATA[#[output application/java --- (payload.userProperties default {}) ++ {"contentType": payload.contentType default "application/json"}]]]></anypoint-mq:properties>
+				</anypoint-mq:publish>
+					<flow-ref doc:name="Delete key from OS" doc:id="5dc799ae-3c2a-499c-9829-9198282d6bff" name="sf-delete-key-from-os-impl" />
+				</foreach>
+				<ee:transform doc:name="Response" doc:id="151e34c2-7b3f-4805-b8c1-23b16107097d">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var message = vars.amqConfig.transaction match {
+				case "RTO" -> "Returned message/s '" ++ ((vars.osAttributes.messageIdList default []) joinBy ", ") ++ "' to source queue: " ++ (vars.amqConfig.queueName default "")
+				case "TMQ" -> "Published message/s '" ++ ((vars.osAttributes.messageIdList default []) joinBy ", ") ++ "' from " ++ (vars.amqConfig.sourceQueue default "") ++ " to " ++ (vars.amqConfig.targetQueue default "")
+			}
+---
+{
+	"message": message
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</when>
+			<otherwise>
+				<ee:transform doc:name="Message Id or returnAllMessages is mandatory" doc:id="2d85f4a8-553b-4faf-823e-7b9a2ca99045">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Either provide messageId or set returnAllMessages to true"
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<logger level="INFO" doc:name="Logger" doc:id="9b4cc7fc-413e-45c3-8fbf-ee71567f2460" message="#[payload]"/>
+			</otherwise>
+		</choice>
+		<error-handler >
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="ce85a23f-83aa-4c3f-a470-1afedfe47064" type="ANYPOINT-MQ:DESTINATION_NOT_FOUND">
+				<ee:transform doc:name="Transform Message" doc:id="2de2c57d-c77f-47e7-a7dc-7c36c65e942e" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Queue not available. The target queue does not exist in this region/org/environment.",
+	"error": error.description default "DESTINATION_NOT_FOUND"
+}]]></ee:set-payload>
+					</ee:message>
+					<ee:variables >
+						<ee:set-variable variableName="httpStatus" ><![CDATA[400]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+</mule>

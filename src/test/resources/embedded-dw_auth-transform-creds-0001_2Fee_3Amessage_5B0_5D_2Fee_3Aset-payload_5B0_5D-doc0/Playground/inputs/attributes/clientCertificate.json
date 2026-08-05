@@ -1,0 +1,74 @@
+{
+  "basicConstraints": 61,
+  "criticalExtensionOIDs": [
+    "nunc",
+    "a"
+  ],
+  "extendedKeyUsage": [
+    "pretium",
+    "aliquam",
+    "tempor"
+  ],
+  "extensions": [
+    {
+      "criticality": true,
+      "oid": "risus"
+    }
+  ],
+  "issuerAlternativeNames": [
+    {
+      "name": "Alfred",
+      "type": 44
+    }
+  ],
+  "issuerDN": {
+    "commonName": "ipsum",
+    "name": "Chad"
+  },
+  "issuerUniqueID": [
+    true,
+    false,
+    true
+  ],
+  "issuerX500Principal": {
+    "name": "Buddy"
+  },
+  "keyUsage": [
+    true,
+    false
+  ],
+  "name": "Amelia",
+  "nonCriticalExtensionOIDs": [
+    "risus",
+    "libero"
+  ],
+  "notAfter": "2024-08-01",
+  "notBefore": "2024-09-18",
+  "publicKey": {
+    "algorithm": "molestie",
+    "modulus": 45,
+    "params": 99,
+    "publicKey": "Aliquam"
+  },
+  "serialNumber": 87,
+  "serialNumberObject": {
+    "serialNumber": 24
+  },
+  "sigAlgName": "vitae",
+  "sigAlgOID": "a",
+  "subjectAlternativeNames": [
+    {
+      "name": "Anastasia",
+      "type": 90
+    }
+  ],
+  "subjectDN": {
+    "commonName": "nibh",
+    "name": "Cody"
+  },
+  "subjectX500Principal": {
+    "name": "Alethia"
+  },
+  "type": "faucibus",
+  "version": 75
+}

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:anypoint-mq="http://www.mulesoft.org/schema/mule/anypoint-mq"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/anypoint-mq http://www.mulesoft.org/schema/mule/anypoint-mq/current/mule-anypoint-mq.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	<sub-flow name="sf-store-in-os-impl" doc:id="54c4d0cb-a2c8-4409-86b9-c25d50bc8292">
+		<os:store doc:name="Store" doc:id="4ef35530-c829-4c76-8b65-d80b913d6243" key='#[[vars.amqConfig.orgId, vars.amqConfig.envId, vars.amqConfig.queueName, vars.mqAttributes.messageId] joinBy "_"]' objectStore="AMQ_Object_store">
+			<os:value><![CDATA[#[output application/java --- {
+	"data": vars.mqData,
+	"contentType": vars.mqContentType default "application/json",
+	"userProperties": vars.userProperties,
+	"sequence": vars.sequence,
+	"created": vars.mqAttributes.headers.created default now()
+}]]]></os:value>
+		</os:store>
+	</sub-flow>
+	<sub-flow name="sf-retrieve-all-keys-impl" doc:id="c427151a-f05a-4769-8fe5-252d186a865b" >
+		<os:retrieve-all-keys doc:name="Retrieve all keys" doc:id="a0a67716-3351-42c0-b88b-a1bade3c98dc" objectStore="AMQ_Object_store"/>
+		<ee:transform doc:name="Filter keys by OrgId, EnvId and QueueName" doc:id="661703ee-05d0-491e-9d4b-394a4376679c">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var baseKey = [vars.osAttributes.orgId, vars.osAttributes.envId, vars.osAttributes.queueName default ""]
+---
+(payload default []) filter ([($ splitBy "_")[0],($ splitBy "_")[1],($ splitBy "_")[2]] == baseKey)]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</sub-flow>
+	<sub-flow name="sf-retrieve-single-key-impl" doc:id="52adc4af-6ff9-4e35-bbfc-1b2ba30c57e8" >
+		<set-variable value='#[if(vars.keyAvailable default false)&#10;	vars.osKey&#10;else&#10;	[vars.osAttributes.orgId, vars.osAttributes.envId, vars.osAttributes.queueName, vars.osAttributes.messageId] joinBy "_"]' doc:name="keyName" doc:id="c6a3b21d-cf3e-4a57-9348-01735b0e66a7" variableName="keyName" />
+		<os:retrieve doc:name="Retrieve" doc:id="66dd1962-0983-4696-a13f-e2f5ef013001" objectStore="AMQ_Object_store" key='#[vars.keyName]'>
+			<os:default-value ><![CDATA[#[{}]]]></os:default-value>
+		</os:retrieve>
+	</sub-flow>
+	<sub-flow name="sf-delete-key-from-os-impl" doc:id="7aa08743-36ff-4995-9011-0d64c4318d73" >
+		<set-variable value='#[if(vars.keyAvailable default false)&#10;	vars.osKey&#10;else&#10;	[vars.osAttributes.orgId, vars.osAttributes.envId, vars.osAttributes.queueName, vars.osAttributes.messageId] joinBy "_"]' doc:name="keyName" doc:id="65382c14-5b0b-4300-a167-48a50a1ddb21" variableName="keyName" />
+		<os:remove doc:name="Remove" doc:id="b910be9a-32a5-4a64-8749-260b0612c1b1" objectStore="AMQ_Object_store" key="#[vars.keyName]"/>
+	</sub-flow>
+</mule>

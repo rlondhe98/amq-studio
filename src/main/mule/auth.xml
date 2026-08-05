@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:java="http://www.mulesoft.org/schema/mule/java" xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/java http://www.mulesoft.org/schema/mule/java/current/mule-java.xsd">
+	<!-- Initialize RSA key pair on app startup (generated in-memory, no keystore needed) -->
+	<flow name="pf-auth-crypto-init" doc:id="auth-flow-crypto-init-0001" initialState="started">
+		<scheduler doc:name="Run once on startup" doc:id="auth-scheduler-init-0001">
+			<scheduling-strategy>
+				<fixed-frequency frequency="9999" timeUnit="DAYS" startDelay="0"/>
+			</scheduling-strategy>
+		</scheduler>
+		<java:invoke-static doc:name="Init CryptoUtil" doc:id="auth-java-init-0001" class="com.amqstudio.security.CryptoUtil" method="init()">
+		</java:invoke-static>
+		<logger level="INFO" doc:name="Log init complete" message="RSA key pair initialized successfully." />
+	</flow>
+	<!-- Serves the RSA public key so the frontend can encrypt credentials -->
+	<flow name="pf-auth-public-key" doc:id="auth-flow-pubkey-0001" >
+		<http:listener doc:name="Auth Public Key" doc:id="auth-listener-pubkey-0001" config-ref="HTTP_Listener_config" path="/auth/public-key" allowedMethods="GET"/>
+		<java:invoke-static doc:name="Get Public Key" doc:id="auth-java-pubkey-0001" class="com.amqstudio.security.CryptoUtil" method="getPublicKey()" />
+		<ee:transform doc:name="Return public key JSON" doc:id="auth-transform-pubkey-0001">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	publicKey: payload
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<!-- Login with Connected App: exchanges client credentials for a server-side session -->
+	<flow name="pf-auth-login-impl" doc:id="auth-flow-login-0001" >
+		<http:listener doc:name="Auth Login" doc:id="auth-listener-login-0001" config-ref="HTTP_Listener_config" path="/auth/login" allowedMethods="POST">
+			<http:response statusCode="#[vars.httpStatus default 200]" />
+			<http:error-response statusCode="#[vars.httpStatus default 500]">
+				<http:body>#[payload]</http:body>
+				<http:headers>#[output application/java --- {"Content-Type": "application/json"}]</http:headers>
+			</http:error-response>
+		</http:listener>
+		<!-- Decrypt the RSA-encrypted credentials from the request body -->
+		<ee:transform doc:name="Extract encrypted payload" doc:id="auth-transform-extract-0001">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload.encrypted]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<java:invoke-static doc:name="RSA Decrypt" doc:id="auth-java-decrypt-0001" class="com.amqstudio.security.CryptoUtil" method="decrypt(String)">
+			<java:args><![CDATA[#[{arg0: payload}]]]></java:args>
+		</java:invoke-static>
+		<ee:transform doc:name="Parse decrypted credentials" doc:id="auth-transform-creds-0001">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+var creds = read(payload, "application/json")
+---
+{
+	clientId: creds.clientId,
+	clientSecret: creds.clientSecret
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<!-- Call Anypoint OAuth2 token endpoint with client_credentials grant -->
+		<http:request method="POST" doc:name="Call OAuth2 token endpoint" doc:id="auth-request-token-0001" config-ref="Anypoint_Platform_Request_Config" path="/accounts/api/v2/oauth2/token">
+			<http:body><![CDATA[#[output application/x-www-form-urlencoded --- {
+	"grant_type": "client_credentials",
+	"client_id": payload.clientId,
+	"client_secret": payload.clientSecret
+}]]]></http:body>
+			<http:headers><![CDATA[#[output application/java --- {"Content-Type": "application/x-www-form-urlencoded"}]]]></http:headers>
+		</http:request>
+		<!-- Store token in Object Store keyed by a generated session ID -->
+		<ee:transform doc:name="Prepare session data" doc:id="auth-transform-session-0001">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+{
+	accessToken: payload.access_token,
+	tokenType: payload.token_type default "bearer",
+	expiresIn: payload.expires_in default 3600
+}]]></ee:set-payload>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="sessionId"><![CDATA[%dw 2.0
+output application/java
+---
+uuid()]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<os:store doc:name="Store session token" doc:id="auth-os-store-0001" objectStore="Auth_Session_Object_store" key="#[vars.sessionId]">
+			<os:value><![CDATA[#[output application/json --- payload]]]></os:value>
+		</os:store>
+		<ee:transform doc:name="Return session ID only" doc:id="auth-transform-response-0001">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	sessionId: vars.sessionId,
+	expiresIn: 3600
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<error-handler>
+			<on-error-propagate type="HTTP:UNAUTHORIZED, HTTP:FORBIDDEN">
+				<set-variable variableName="httpStatus" value="#[401]" doc:name="Set 401" doc:id="auth-set-401"/>
+				<ee:transform doc:name="Auth error response" doc:id="auth-error-unauth-0001">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	error: "Authentication failed. Please verify your Client ID and Client Secret.",
+	status: 401
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+			<on-error-propagate type="ANY">
+				<set-variable variableName="httpStatus" value="#[500]" doc:name="Set 500" doc:id="auth-set-500"/>
+				<ee:transform doc:name="Generic error response" doc:id="auth-error-generic-0001">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	error: "Failed to authenticate. " ++ (error.description default "Unknown error."),
+	status: 500
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<!-- Store AMQ credentials: encrypts and stores client credentials server-side, returns a connection ID -->
+	<flow name="pf-auth-store-credentials" doc:id="auth-flow-store-creds-0001" >
+		<http:listener doc:name="Store Credentials" doc:id="auth-listener-store-creds-0001" config-ref="HTTP_Listener_config" path="/auth/store-credentials" allowedMethods="POST">
+			<http:response statusCode="#[vars.httpStatus default 200]" />
+			<http:error-response statusCode="#[vars.httpStatus default 500]">
+				<http:body>#[payload]</http:body>
+				<http:headers>#[output application/java --- {"Content-Type": "application/json"}]</http:headers>
+			</http:error-response>
+		</http:listener>
+		<ee:transform doc:name="Extract encrypted payload" doc:id="auth-store-extract-0001">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload.encrypted]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<java:invoke-static doc:name="RSA Decrypt" doc:id="auth-store-decrypt-0001" class="com.amqstudio.security.CryptoUtil" method="decrypt(String)">
+			<java:args><![CDATA[#[{arg0: payload}]]]></java:args>
+		</java:invoke-static>
+		<ee:transform doc:name="Store credentials and return connection ID" doc:id="auth-store-transform-0001">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+read(payload, "application/json")]]></ee:set-payload>
+			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="connectionId"><![CDATA[%dw 2.0
+output application/java
+---
+uuid()]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<os:store doc:name="Store AMQ credentials" doc:id="auth-store-os-0001" objectStore="Auth_Session_Object_store" key="#[vars.connectionId]">
+			<os:value><![CDATA[#[output application/json --- {
+	amqClientId: payload.clientId,
+	amqClientSecret: payload.clientSecret
+}]]]></os:value>
+		</os:store>
+		<ee:transform doc:name="Return connection ID" doc:id="auth-store-response-0001">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	connectionId: vars.connectionId
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<error-handler>
+			<on-error-propagate type="ANY">
+				<set-variable variableName="httpStatus" value="#[500]" doc:name="Set 500" doc:id="auth-store-set-500"/>
+				<ee:transform doc:name="Error response" doc:id="auth-store-error-0001">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	error: "Failed to store credentials. " ++ (error.description default "Unknown error."),
+	status: 500
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+	<!-- Logout: removes the session from Object Store -->
+	<flow name="pf-auth-logout-impl" doc:id="auth-flow-logout-0001" >
+		<http:listener doc:name="Auth Logout" doc:id="auth-listener-logout-0001" config-ref="HTTP_Listener_config" path="/auth/logout" allowedMethods="DELETE"/>
+		<os:remove doc:name="Remove session" doc:id="auth-os-remove-0001" objectStore="Auth_Session_Object_store" key="#[attributes.headers.'X-Session-Id']"/>
+		<ee:transform doc:name="Logout response" doc:id="auth-transform-logout-0001">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message: "Session terminated."
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<error-handler>
+			<on-error-continue type="OS:KEY_NOT_FOUND">
+				<ee:transform doc:name="Already logged out" doc:id="auth-error-notfound-0001">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message: "Session already expired or not found."
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-continue>
+		</error-handler>
+	</flow>
+	<!-- Sub-flow: Resolve bearer token from session or Authorization header -->
+	<sub-flow name="sf-resolve-bearer-token" doc:id="auth-subflow-resolve-0001">
+		<choice doc:name="Check for session ID" doc:id="auth-choice-resolve-0001">
+			<when expression="#[attributes.headers.'X-Session-Id' != null and attributes.headers.'X-Session-Id' != '']">
+				<os:retrieve doc:name="Retrieve session token" doc:id="auth-os-retrieve-0001" objectStore="Auth_Session_Object_store" key="#[attributes.headers.'X-Session-Id']" target="sessionData"/>
+				<ee:transform doc:name="Set Authorization from session" doc:id="auth-transform-resolve-0001">
+					<ee:variables>
+						<ee:set-variable variableName="resolvedAuthorization"><![CDATA[%dw 2.0
+output application/java
+var session = vars.sessionData
+---
+"Bearer " ++ session.accessToken]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+			</when>
+			<otherwise>
+				<set-variable doc:name="Use Authorization header" doc:id="auth-setvar-direct-0001" variableName="resolvedAuthorization" value="#[attributes.headers.Authorization]"/>
+			</otherwise>
+		</choice>
+	</sub-flow>
+	<!-- Sub-flow: Resolve AMQ credentials from X-Connection-Id header -->
+	<sub-flow name="sf-resolve-amq-credentials" doc:id="auth-subflow-resolve-amq-0001">
+		<os:retrieve doc:name="Retrieve AMQ credentials" doc:id="auth-os-retrieve-amq-0001" objectStore="Auth_Session_Object_store" key="#[attributes.headers.'x-connection-id']" target="amqCredentials"/>
+		<ee:transform doc:name="Set AMQ credentials vars" doc:id="auth-transform-amq-creds-0001">
+			<ee:variables>
+				<ee:set-variable variableName="resolvedAmqClientId"><![CDATA[%dw 2.0
+output application/java
+---
+vars.amqCredentials.amqClientId]]></ee:set-variable>
+				<ee:set-variable variableName="resolvedAmqClientSecret"><![CDATA[%dw 2.0
+output application/java
+---
+vars.amqCredentials.amqClientSecret]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+	</sub-flow>
+</mule>

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:anypoint-mq="http://www.mulesoft.org/schema/mule/anypoint-mq"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/anypoint-mq http://www.mulesoft.org/schema/mule/anypoint-mq/current/mule-anypoint-mq.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	<!-- Global Configuration -->
+	<configuration-properties doc:name="Configuration properties" doc:id="4c7f8e8c-1332-460a-9c06-703d080a4167" file="configurations\dev.yaml" />
+	<!-- Anypoint MQ Connector -->
+	<anypoint-mq:config name="Anypoint_MQ_Config" doc:name="Anypoint MQ Config" doc:id="db446c53-ed85-415e-b247-f7e024559be8" >
+		<anypoint-mq:connection url="#[vars.amqConfig.mqUrl]" clientId="#[vars.amqConfig.amqClientId]" clientSecret="#[vars.amqConfig.amqClientSecret]"/>
+	</anypoint-mq:config>
+	<!-- Object Store -->
+	<os:config name="ObjectStore_Config" doc:name="ObjectStore Config" doc:id="c5f26931-8085-41e0-b448-412a298bbb56" >
+		<os:connection >
+			<reconnection >
+				<reconnect />
+			</reconnection>
+		</os:connection>
+	</os:config>
+	<os:object-store name="AMQ_Object_store" doc:name="Object store" doc:id="2a6dc253-a52b-4626-8bb7-6ee46b790f89" config-ref="ObjectStore_Config" entryTtl="${objectStore.entryTtl}" entryTtlUnit="DAYS" expirationInterval="${objectStore.expirationInterval}"/>
+	<os:object-store name="Lock_Object_store" doc:name="Lock Object store" doc:id="b3c4d5e6-f7a8-9012-bcde-lock00000001" config-ref="ObjectStore_Config" entryTtl="${lock.entryTtl}" entryTtlUnit="DAYS" expirationInterval="${lock.expirationInterval}"/>
+	<os:object-store name="Auth_Session_Object_store" doc:name="Auth Session Object store" doc:id="a1b2c3d4-e5f6-7890-abcd-auth00000001" config-ref="ObjectStore_Config" entryTtl="${auth.sessionTtl}" entryTtlUnit="HOURS" expirationInterval="60"/>
+	<!-- HTTP Listener -->
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="45ddbb69-426b-4c0c-8f50-b2d950a73650" >
+		<http:listener-connection host="${http.host}" port="${http.port}" />
+		<http:listener-interceptors>
+			<http:cors-interceptor>
+				<http:origins>
+					<http:public-resource/>
+				</http:origins>
+			</http:cors-interceptor>
+		</http:listener-interceptors>
+	</http:listener-config>
+	<!-- Anypoint Platform HTTP Request Config -->
+	<http:request-config name="Anypoint_Platform_Request_Config" doc:name="Anypoint Platform Request Config" doc:id="platform-req-config-0001" >
+		<http:request-connection protocol="HTTPS" host="${anypointPlatform.host}" port="443" />
+	</http:request-config>
+</mule>

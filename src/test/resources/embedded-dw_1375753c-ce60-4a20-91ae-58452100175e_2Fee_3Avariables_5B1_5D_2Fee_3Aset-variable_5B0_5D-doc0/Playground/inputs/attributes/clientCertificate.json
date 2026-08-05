@@ -1,0 +1,77 @@
+{
+  "basicConstraints": 52,
+  "criticalExtensionOIDs": [
+    "aliquam",
+    "pulvinar",
+    "lorem"
+  ],
+  "extendedKeyUsage": [
+    "felis",
+    "nibh",
+    "aliquam"
+  ],
+  "extensions": [
+    {
+      "criticality": false,
+      "oid": "erat"
+    }
+  ],
+  "issuerAlternativeNames": [
+    {
+      "name": "Cristobal",
+      "type": 71
+    }
+  ],
+  "issuerDN": {
+    "commonName": "Nam",
+    "name": "Anabel"
+  },
+  "issuerUniqueID": [
+    true,
+    true,
+    false
+  ],
+  "issuerX500Principal": {
+    "name": "Alfreda"
+  },
+  "keyUsage": [
+    false,
+    true,
+    false
+  ],
+  "name": "Altha",
+  "nonCriticalExtensionOIDs": [
+    "adipiscing",
+    "elit",
+    "pretium"
+  ],
+  "notAfter": "2026-01-12",
+  "notBefore": "2024-04-24",
+  "publicKey": {
+    "algorithm": "sodales",
+    "modulus": 18,
+    "params": 52,
+    "publicKey": "ipsum"
+  },
+  "serialNumber": 0,
+  "serialNumberObject": {
+    "serialNumber": 22
+  },
+  "sigAlgName": "ipsum",
+  "sigAlgOID": "adipiscing",
+  "subjectAlternativeNames": [
+    {
+      "name": "Adria",
+      "type": 69
+    }
+  ],
+  "subjectDN": {
+    "commonName": "convallis",
+    "name": "Adrien"
+  },
+  "subjectX500Principal": {
+    "name": "America"
+  },
+  "type": "elit",
+  "version": 70
+}

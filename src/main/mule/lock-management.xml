@@ -1,0 +1,330 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:anypoint-mq="http://www.mulesoft.org/schema/mule/anypoint-mq"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/anypoint-mq http://www.mulesoft.org/schema/mule/anypoint-mq/current/mule-anypoint-mq.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd">
+	<flow name="pf-acquire-lock-impl" doc:id="lock-flow-acquire-0001" >
+		<http:listener doc:name="Acquire lock" doc:id="lock-listener-acquire-0001" config-ref="HTTP_Listener_config" path="/acquire-lock" allowedMethods="POST">
+			<http:response statusCode="#[vars.httpStatus default 200]" />
+		</http:listener>
+		<flow-ref doc:name="Resolve AMQ Credentials" name="sf-resolve-amq-credentials" />
+		<ee:transform doc:name="Set lock params" doc:id="lock-transform-0001">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="lockKey"><![CDATA[%dw 2.0
+output application/java
+---
+"lock_" ++ attributes.headers.orgId ++ "_" ++ attributes.headers.envId ++ "_" ++ attributes.queryParams.queueName]]></ee:set-variable>
+				<ee:set-variable variableName="lockData"><![CDATA[%dw 2.0
+output application/java
+---
+{
+	"region": attributes.headers.region,
+	"orgId": attributes.headers.orgId,
+	"envId": attributes.headers.envId,
+	"amqClientId": vars.resolvedAmqClientId,
+	"amqClientSecret": vars.resolvedAmqClientSecret,
+	"queueName": attributes.queryParams.queueName,
+	"lastActivity": now() as String {format: "yyyy-MM-dd'T'HH:mm:ss"}
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<try doc:name="Try" doc:id="lock-try-0001">
+			<os:contains doc:name="Check lock exists" doc:id="lock-contains-0001" key="#[vars.lockKey]" objectStore="Lock_Object_store" target="lockExists" />
+			<choice doc:name="Lock exists?" doc:id="lock-choice-0001">
+				<when expression="#[vars.lockExists]">
+					<set-variable value="#[409]" doc:name="Set 409" doc:id="lock-set-409" variableName="httpStatus" />
+					<ee:transform doc:name="Lock conflict response" doc:id="lock-conflict-0001">
+						<ee:message>
+							<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "This queue is currently being accessed by another user. Please try again later.",
+	"locked": true
+}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+				</when>
+				<otherwise>
+					<os:store doc:name="Store lock" doc:id="lock-store-0001" key="#[vars.lockKey]" objectStore="Lock_Object_store">
+						<os:value><![CDATA[#[vars.lockData]]]></os:value>
+					</os:store>
+					<ee:transform doc:name="Lock acquired response" doc:id="lock-acquired-0001">
+						<ee:message>
+							<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Lock acquired successfully.",
+	"locked": false
+}]]></ee:set-payload>
+						</ee:message>
+					</ee:transform>
+				</otherwise>
+			</choice>
+		</try>
+	</flow>
+	<flow name="pf-renew-lock-impl" doc:id="lock-flow-renew-0001" >
+		<http:listener doc:name="Renew lock" doc:id="lock-listener-renew-0001" config-ref="HTTP_Listener_config" path="/renew-lock" allowedMethods="PUT"/>
+		<flow-ref doc:name="Resolve AMQ Credentials" name="sf-resolve-amq-credentials" />
+		<ee:transform doc:name="Set lock params" doc:id="lock-renew-transform-0001">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="lockKey"><![CDATA[%dw 2.0
+output application/java
+---
+"lock_" ++ attributes.headers.orgId ++ "_" ++ attributes.headers.envId ++ "_" ++ attributes.queryParams.queueName]]></ee:set-variable>
+				<ee:set-variable variableName="lockData"><![CDATA[%dw 2.0
+output application/java
+---
+{
+	"region": attributes.headers.region,
+	"orgId": attributes.headers.orgId,
+	"envId": attributes.headers.envId,
+	"amqClientId": vars.resolvedAmqClientId,
+	"amqClientSecret": vars.resolvedAmqClientSecret,
+	"queueName": attributes.queryParams.queueName,
+	"lastActivity": now() as String {format: "yyyy-MM-dd'T'HH:mm:ss"}
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<os:store doc:name="Update lock" doc:id="lock-renew-store-0001" key="#[vars.lockKey]" objectStore="Lock_Object_store" failIfPresent="false">
+			<os:value><![CDATA[#[vars.lockData]]]></os:value>
+		</os:store>
+		<ee:transform doc:name="Response" doc:id="lock-renew-response-0001">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Lock renewed."
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="pf-release-lock-impl" doc:id="lock-flow-release-0001" >
+		<http:listener doc:name="Release lock" doc:id="lock-listener-release-0001" config-ref="HTTP_Listener_config" path="/release-lock" allowedMethods="DELETE"/>
+		<ee:transform doc:name="Set lock key" doc:id="lock-release-transform-0001">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="lockKey"><![CDATA[%dw 2.0
+output application/java
+---
+"lock_" ++ attributes.headers.orgId ++ "_" ++ attributes.headers.envId ++ "_" ++ attributes.queryParams.queueName]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<try doc:name="Try" doc:id="lock-release-try-0001">
+			<os:remove doc:name="Remove lock" doc:id="lock-release-remove-0001" key="#[vars.lockKey]" objectStore="Lock_Object_store"/>
+			<error-handler>
+				<on-error-continue enableNotifications="false" logException="false" doc:name="On Error Continue" doc:id="lock-release-error-0001" />
+			</error-handler>
+		</try>
+		<ee:transform doc:name="Response" doc:id="lock-release-response-0001">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Lock released."
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="pf-lock-expiry-scheduler-impl" doc:id="lock-flow-scheduler-0001" >
+		<scheduler doc:name="Check stale locks" doc:id="lock-scheduler-0001">
+			<scheduling-strategy>
+				<fixed-frequency frequency="${lock.schedulerFrequency}" timeUnit="MINUTES"/>
+			</scheduling-strategy>
+		</scheduler>
+		<os:retrieve-all-keys doc:name="Retrieve all lock keys" doc:id="lock-scheduler-retrieve-keys-0001" objectStore="Lock_Object_store"/>
+		<foreach doc:name="For Each lock" doc:id="lock-scheduler-foreach-0001" collection="#[payload]">
+			<set-variable value="#[payload]" doc:name="Current lock key" doc:id="lock-scheduler-setlockkey-0001" variableName="currentLockKey" />
+			<os:retrieve doc:name="Retrieve lock data" doc:id="lock-scheduler-retrieve-0001" key="#[vars.currentLockKey]" objectStore="Lock_Object_store" target="lockEntry">
+				<os:default-value><![CDATA[#[{}]]]></os:default-value>
+			</os:retrieve>
+			<choice doc:name="Is lock stale?" doc:id="lock-scheduler-choice-0001">
+				<when expression='#[!isEmpty(vars.lockEntry) and vars.lockEntry.lastActivity != null and ((vars.lockEntry.lastActivity as DateTime) + (("PT" ++ Mule::p("lock.staleThreshold") ++ "M") as Period)) &lt; now()]'>
+					<logger level="INFO" doc:name="Stale lock found" doc:id="lock-scheduler-log-0001" message='#["Stale lock found for queue: " ++ (vars.lockEntry.queueName default "") ++ ". Returning messages to source queue."]'/>
+					<ee:transform doc:name="Set AMQ config from lock" doc:id="lock-scheduler-setconfig-0001">
+						<ee:message />
+						<ee:variables>
+							<ee:set-variable variableName="amqConfig"><![CDATA[%dw 2.0
+output application/java
+var lockData = vars.lockEntry
+var mqUrl = Mule::p('anypointMQ.url') replace "{region}" with lockData.region replace "{orgId}" with lockData.orgId replace "{envId}" with lockData.envId
+---
+{
+	"orgId": lockData.orgId,
+	"envId": lockData.envId,
+	"mqUrl": mqUrl,
+	"amqClientId": lockData.amqClientId,
+	"amqClientSecret": lockData.amqClientSecret,
+	"queueName": lockData.queueName
+}]]></ee:set-variable>
+							<ee:set-variable variableName="osAttributes"><![CDATA[%dw 2.0
+output application/java
+var lockData = vars.lockEntry
+---
+{
+	"orgId": lockData.orgId,
+	"envId": lockData.envId,
+	"queueName": lockData.queueName
+}]]></ee:set-variable>
+							<ee:set-variable variableName="messages"><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+						</ee:variables>
+					</ee:transform>
+					<flow-ref doc:name="Retrieve all keys" doc:id="lock-scheduler-retrieve-all-0001" name="sf-retrieve-all-keys-impl"/>
+					<choice doc:name="Messages available?" doc:id="lock-scheduler-choice-msgs-0001">
+						<when expression="#[sizeOf(payload default []) > 0]">
+							<foreach doc:name="For Each message" doc:id="lock-scheduler-foreach-msgs-0001" collection="#[payload]">
+								<set-variable value="#[true]" doc:name="Key available" doc:id="lock-scheduler-setkey-0001" variableName="keyAvailable" />
+								<set-variable value="#[payload]" doc:name="OS Key" doc:id="lock-scheduler-setoskey-0001" variableName="osKey" />
+								<flow-ref doc:name="Retrieve single key" doc:id="lock-scheduler-retrieve-single-0001" name="sf-retrieve-single-key-impl"/>
+								<ee:transform doc:name="Aggregate" doc:id="lock-scheduler-aggregate-0001">
+									<ee:message />
+									<ee:variables>
+										<ee:set-variable variableName="messages"><![CDATA[%dw 2.0
+output application/java
+---
+(vars.messages default []) + payload]]></ee:set-variable>
+									</ee:variables>
+								</ee:transform>
+								<flow-ref doc:name="Delete key from OS" doc:id="lock-scheduler-delete-0001" name="sf-delete-key-from-os-impl"/>
+							</foreach>
+							<foreach doc:name="Publish back to queue" doc:id="lock-scheduler-publish-0001" collection="#[vars.messages orderBy $.sequence]">
+								<anypoint-mq:publish doc:name="Publish" doc:id="lock-scheduler-publish-msg-0001" config-ref="Anypoint_MQ_Config" destination="#[vars.amqConfig.queueName]">
+									<anypoint-mq:body><![CDATA[#[%dw 2.0
+var baseCt = trim(((payload.contentType default "application/json") splitBy ";")[0])
+var ct = if(baseCt == "text/csv") "application/csv" else baseCt
+output application/java
+---
+if(payload.data is String) payload.data
+else write(payload.data default "", ct)]]]></anypoint-mq:body>
+									<anypoint-mq:properties><![CDATA[#[output application/java --- (payload.userProperties default {}) ++ {"contentType": payload.contentType default "application/json"}]]]></anypoint-mq:properties>
+								</anypoint-mq:publish>
+							</foreach>
+							<logger level="INFO" doc:name="Messages returned" doc:id="lock-scheduler-log-done-0001" message='#["Returned " ++ (sizeOf(vars.messages) as String) ++ " messages to queue: " ++ vars.amqConfig.queueName]'/>
+						</when>
+					</choice>
+					<try doc:name="Try remove lock" doc:id="lock-scheduler-remove-try-0001">
+						<os:remove doc:name="Remove stale lock" doc:id="lock-scheduler-remove-0001" key="#[vars.currentLockKey]" objectStore="Lock_Object_store"/>
+						<error-handler>
+							<on-error-continue enableNotifications="false" logException="false" doc:name="On Error Continue" doc:id="lock-scheduler-remove-error-0001" />
+						</error-handler>
+					</try>
+				</when>
+			</choice>
+		</foreach>
+	</flow>
+	<flow name="pf-force-disconnect-impl" doc:id="lock-flow-force-disconnect-0001" >
+		<http:listener doc:name="Force disconnect" doc:id="lock-listener-force-disconnect-0001" config-ref="HTTP_Listener_config" path="/force-disconnect" allowedMethods="DELETE">
+			<http:response statusCode="200" />
+		</http:listener>
+		<ee:transform doc:name="Set lock key" doc:id="lock-force-disconnect-transform-0001">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="lockKey"><![CDATA[%dw 2.0
+output application/java
+---
+"lock_" ++ attributes.headers.orgId ++ "_" ++ attributes.headers.envId ++ "_" ++ attributes.queryParams.queueName]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<try doc:name="Try" doc:id="lock-force-disconnect-try-0001">
+			<os:retrieve doc:name="Retrieve lock data" doc:id="lock-force-disconnect-retrieve-0001" key="#[vars.lockKey]" objectStore="Lock_Object_store" target="lockEntry">
+				<os:default-value><![CDATA[#[{}]]]></os:default-value>
+			</os:retrieve>
+			<choice doc:name="Lock exists?" doc:id="lock-force-disconnect-choice-0001">
+				<when expression="#[!isEmpty(vars.lockEntry)]">
+					<ee:transform doc:name="Set AMQ config from lock" doc:id="lock-force-disconnect-setconfig-0001">
+						<ee:message />
+						<ee:variables>
+							<ee:set-variable variableName="amqConfig"><![CDATA[%dw 2.0
+output application/java
+var lockData = vars.lockEntry
+var mqUrl = Mule::p('anypointMQ.url') replace "{region}" with lockData.region replace "{orgId}" with lockData.orgId replace "{envId}" with lockData.envId
+---
+{
+	"orgId": lockData.orgId,
+	"envId": lockData.envId,
+	"mqUrl": mqUrl,
+	"amqClientId": lockData.amqClientId,
+	"amqClientSecret": lockData.amqClientSecret,
+	"queueName": lockData.queueName
+}]]></ee:set-variable>
+							<ee:set-variable variableName="osAttributes"><![CDATA[%dw 2.0
+output application/java
+var lockData = vars.lockEntry
+---
+{
+	"orgId": lockData.orgId,
+	"envId": lockData.envId,
+	"queueName": lockData.queueName
+}]]></ee:set-variable>
+							<ee:set-variable variableName="messages"><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-variable>
+						</ee:variables>
+					</ee:transform>
+					<flow-ref doc:name="Retrieve all keys" doc:id="lock-force-disconnect-retrieve-all-0001" name="sf-retrieve-all-keys-impl"/>
+					<choice doc:name="Messages available?" doc:id="lock-force-disconnect-choice-msgs-0001">
+						<when expression="#[sizeOf(payload default []) > 0]">
+							<foreach doc:name="For Each message" doc:id="lock-force-disconnect-foreach-msgs-0001" collection="#[payload]">
+								<set-variable value="#[true]" doc:name="Key available" doc:id="lock-force-disconnect-setkey-0001" variableName="keyAvailable" />
+								<set-variable value="#[payload]" doc:name="OS Key" doc:id="lock-force-disconnect-setoskey-0001" variableName="osKey" />
+								<flow-ref doc:name="Retrieve single key" doc:id="lock-force-disconnect-retrieve-single-0001" name="sf-retrieve-single-key-impl"/>
+								<ee:transform doc:name="Aggregate" doc:id="lock-force-disconnect-aggregate-0001">
+									<ee:message />
+									<ee:variables>
+										<ee:set-variable variableName="messages"><![CDATA[%dw 2.0
+output application/java
+---
+(vars.messages default []) + payload]]></ee:set-variable>
+									</ee:variables>
+								</ee:transform>
+								<flow-ref doc:name="Delete key from OS" doc:id="lock-force-disconnect-delete-0001" name="sf-delete-key-from-os-impl"/>
+							</foreach>
+							<foreach doc:name="Publish back to queue" doc:id="lock-force-disconnect-publish-0001" collection="#[vars.messages orderBy $.sequence]">
+								<anypoint-mq:publish doc:name="Publish" doc:id="lock-force-disconnect-publish-msg-0001" config-ref="Anypoint_MQ_Config" destination="#[vars.amqConfig.queueName]">
+									<anypoint-mq:body><![CDATA[#[%dw 2.0
+var baseCt = trim(((payload.contentType default "application/json") splitBy ";")[0])
+var ct = if(baseCt == "text/csv") "application/csv" else baseCt
+output application/java
+---
+if(payload.data is String) payload.data
+else write(payload.data default "", ct)]]]></anypoint-mq:body>
+									<anypoint-mq:properties><![CDATA[#[output application/java --- (payload.userProperties default {}) ++ {"contentType": payload.contentType default "application/json"}]]]></anypoint-mq:properties>
+								</anypoint-mq:publish>
+							</foreach>
+							<logger level="INFO" doc:name="Messages returned" doc:id="lock-force-disconnect-log-done-0001" message='#["Force disconnect: Returned " ++ (sizeOf(vars.messages) as String) ++ " messages to queue: " ++ vars.amqConfig.queueName]'/>
+						</when>
+					</choice>
+					<os:remove doc:name="Remove lock" doc:id="lock-force-disconnect-remove-0001" key="#[vars.lockKey]" objectStore="Lock_Object_store"/>
+				</when>
+			</choice>
+			<error-handler>
+				<on-error-continue enableNotifications="false" logException="false" doc:name="On Error Continue" doc:id="lock-force-disconnect-error-0001">
+					<logger level="WARN" doc:name="Force disconnect error" doc:id="lock-force-disconnect-log-error-0001" message='#["Force disconnect error: " ++ (error.description default "")]'/>
+				</on-error-continue>
+			</error-handler>
+		</try>
+		<ee:transform doc:name="Response" doc:id="lock-force-disconnect-response-0001">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Disconnect completed."
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>

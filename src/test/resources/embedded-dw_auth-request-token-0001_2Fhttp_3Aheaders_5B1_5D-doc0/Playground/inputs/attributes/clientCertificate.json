@@ -1,0 +1,75 @@
+{
+  "basicConstraints": 8,
+  "criticalExtensionOIDs": [
+    "elit",
+    "lectus"
+  ],
+  "extendedKeyUsage": [
+    "Nunc",
+    "sodales"
+  ],
+  "extensions": [
+    {
+      "criticality": false,
+      "oid": "sed"
+    }
+  ],
+  "issuerAlternativeNames": [
+    {
+      "name": "Dana",
+      "type": 7
+    }
+  ],
+  "issuerDN": {
+    "commonName": "ut",
+    "name": "Allen"
+  },
+  "issuerUniqueID": [
+    true,
+    true,
+    false
+  ],
+  "issuerX500Principal": {
+    "name": "Allison"
+  },
+  "keyUsage": [
+    false,
+    false,
+    false
+  ],
+  "name": "Adah",
+  "nonCriticalExtensionOIDs": [
+    "sodales",
+    "dolor",
+    "Nam"
+  ],
+  "notAfter": "2024-11-17",
+  "notBefore": "2026-05-21",
+  "publicKey": {
+    "algorithm": "In",
+    "modulus": 14,
+    "params": 68,
+    "publicKey": "erat"
+  },
+  "serialNumber": 85,
+  "serialNumberObject": {
+    "serialNumber": 55
+  },
+  "sigAlgName": "Lorem",
+  "sigAlgOID": "venenatis",
+  "subjectAlternativeNames": [
+    {
+      "name": "Alisha",
+      "type": 52
+    }
+  ],
+  "subjectDN": {
+    "commonName": "dolor",
+    "name": "Danial"
+  },
+  "subjectX500Principal": {
+    "name": "Chadwick"
+  },
+  "type": "pulvinar",
+  "version": 6
+}

@@ -1,0 +1,41 @@
+http:
+  host: "0.0.0.0"
+  port: "8081"
+
+anypointPlatform:
+  host: "anypoint.mulesoft.com"
+  accounts:
+    me: "/accounts/api/me"
+    organizations: "/accounts/api/organizations/{orgId}/environments"
+  mq:
+    admin:
+      regions: "/mq/admin/api/v1/organizations/{orgId}/environments/{envId}/regions"
+      destinations: "/mq/admin/api/v1/organizations/{orgId}/environments/{envId}/regions/{regionId}/destinations"
+  connectedApps: "/accounts/api/connectedApplications"
+
+anypointMQ:
+  url: "https://{region}.anypoint.mulesoft.com/api/v1/organizations/{orgId}/environments/{envId}"
+  consume:
+    acknowledgementTimeout: "5" # in MINUTES
+    pollingTime: "10" # in SECONDS
+  maxMessages: "10000" # max messages to consume in a single fetch
+
+objectStore:
+  entryTtl: "1" # in DAYS - TTL for message entries
+  expirationInterval: "60" # in SECONDS - how often to check for expired entries
+
+lock:
+  entryTtl: "1" # in DAYS - TTL for lock entries (safety net)
+  expirationInterval: "60" # in SECONDS
+  staleThreshold: "10" # in MINUTES - how long before a lock is considered stale
+  schedulerFrequency: "2" # in MINUTES - how often to check for stale locks
+
+auth:
+  sessionTtl: "1" # in HOURS - TTL for auth sessions (token expiry)
+  keystore:
+    path: "security/keystore.p12"
+    password: "${KEYSTORE_PASSWORD}"
+    alias: "amq-studio-rsa"
+
+app:
+  testModeEnabled: "true" # Set to "true" to show the Testing/Manual mode toggle on the UI
