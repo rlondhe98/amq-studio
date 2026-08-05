@@ -150,5 +150,5 @@ Please open an issue or reach out directly. Every piece of feedback helps.
 ---
 
 ## License
-Internal use only. See your organization's policies for distribution guidelines.
 
+Internal use only. See your organization's policies for distribution guidelines.
