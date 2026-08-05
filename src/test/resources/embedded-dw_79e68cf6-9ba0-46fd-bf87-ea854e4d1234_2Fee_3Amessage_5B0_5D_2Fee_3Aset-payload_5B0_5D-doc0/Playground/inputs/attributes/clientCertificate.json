@@ -1,0 +1,73 @@
+{
+  "basicConstraints": 12,
+  "criticalExtensionOIDs": [
+    "lorem",
+    "dictum"
+  ],
+  "extendedKeyUsage": [
+    "elit",
+    "dictum",
+    "lorem"
+  ],
+  "extensions": [
+    {
+      "criticality": false,
+      "oid": "Pellentesque"
+    }
+  ],
+  "issuerAlternativeNames": [
+    {
+      "name": "Chang",
+      "type": 97
+    }
+  ],
+  "issuerDN": {
+    "commonName": "aliquam",
+    "name": "Adolfo"
+  },
+  "issuerUniqueID": [
+    true,
+    true
+  ],
+  "issuerX500Principal": {
+    "name": "Aleisha"
+  },
+  "keyUsage": [
+    false,
+    true
+  ],
+  "name": "Carroll",
+  "nonCriticalExtensionOIDs": [
+    "consectetur",
+    "arcu"
+  ],
+  "notAfter": "2024-11-06",
+  "notBefore": "2024-12-20",
+  "publicKey": {
+    "algorithm": "eros",
+    "modulus": 33,
+    "params": 92,
+    "publicKey": "mi"
+  },
+  "serialNumber": 5,
+  "serialNumberObject": {
+    "serialNumber": 19
+  },
+  "sigAlgName": "erat",
+  "sigAlgOID": "a",
+  "subjectAlternativeNames": [
+    {
+      "name": "Charlie",
+      "type": 73
+    }
+  ],
+  "subjectDN": {
+    "commonName": "Fusce",
+    "name": "Chad"
+  },
+  "subjectX500Principal": {
+    "name": "Chase"
+  },
+  "type": "tempor",
+  "version": 21
+}

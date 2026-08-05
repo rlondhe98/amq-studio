@@ -1,0 +1,74 @@
+{
+  "basicConstraints": 34,
+  "criticalExtensionOIDs": [
+    "aliquam",
+    "dictum"
+  ],
+  "extendedKeyUsage": [
+    "Aliquam",
+    "venenatis",
+    "consectetur"
+  ],
+  "extensions": [
+    {
+      "criticality": false,
+      "oid": "amet"
+    }
+  ],
+  "issuerAlternativeNames": [
+    {
+      "name": "Claude",
+      "type": 28
+    }
+  ],
+  "issuerDN": {
+    "commonName": "amet",
+    "name": "Alessandra"
+  },
+  "issuerUniqueID": [
+    false,
+    true,
+    false
+  ],
+  "issuerX500Principal": {
+    "name": "Andra"
+  },
+  "keyUsage": [
+    true,
+    true
+  ],
+  "name": "Akilah",
+  "nonCriticalExtensionOIDs": [
+    "tincidunt",
+    "arcu"
+  ],
+  "notAfter": "2022-05-24",
+  "notBefore": "2024-11-18",
+  "publicKey": {
+    "algorithm": "Lorem",
+    "modulus": 29,
+    "params": 88,
+    "publicKey": "dictum"
+  },
+  "serialNumber": 95,
+  "serialNumberObject": {
+    "serialNumber": 15
+  },
+  "sigAlgName": "at",
+  "sigAlgOID": "dictum",
+  "subjectAlternativeNames": [
+    {
+      "name": "Cleveland",
+      "type": 59
+    }
+  ],
+  "subjectDN": {
+    "commonName": "In",
+    "name": "Dale"
+  },
+  "subjectX500Principal": {
+    "name": "Amina"
+  },
+  "type": "Lorem",
+  "version": 30
+}

@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMQ Studio</title>
+    <link rel="icon" type="image/svg+xml" href="logo.svg">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Home Page - Connection Form -->
+        <div id="connection-page" class="page active">
+            <div class="logo-header">
+                <img src="logo.svg" alt="AMQ Studio" class="logo">
+                <h1>AMQ Studio</h1>
+            </div>
+            <p class="subtitle">Connect to Anypoint MQ</p>
+
+            <!-- Mode Toggle (only visible if testModeEnabled) -->
+            <div id="mode-toggle" class="mode-toggle hidden">
+                <button type="button" id="mode-platform" class="mode-btn active">Platform</button>
+                <button type="button" id="mode-manual" class="mode-btn">Manual</button>
+            </div>
+
+            <!-- Platform Mode Form (default) -->
+            <form id="connection-form" class="connection-form">
+                <!-- Connected App auth fields -->
+                <div id="connected-app-auth-section">
+                    <div class="form-group">
+                        <label for="caClientId">Client ID</label>
+                        <input type="text" id="caClientId" name="caClientId" placeholder="Enter Connected App Client ID" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="caClientSecret">Client Secret</label>
+                        <input type="password" id="caClientSecret" name="caClientSecret" placeholder="Enter Connected App Client Secret" required>
+                        <small class="form-hint">Credentials are sent to the server and exchanged for a session. The token is never sent to the browser.</small>
+                    </div>
+                    <button type="button" id="ca-login-btn" class="btn btn-primary">Authenticate</button>
+                    <div id="ca-status" class="form-hint hidden"></div>
+                </div>
+                <!-- Shown after successful authentication -->
+                <div id="authenticated-section" class="hidden">
+                    <div class="auth-success-bar">
+                        <span class="auth-success-text">&#10003; Authenticated</span>
+                        <button type="button" id="ca-disconnect-btn" class="btn btn-sm btn-secondary">Disconnect</button>
+                    </div>
+                </div>
+                <div class="form-group hidden" id="orgGroup">
+                    <label for="orgId">Organization</label>
+                    <select id="orgId" name="orgId" required>
+                        <option value="">-- Select Organization --</option>
+                    </select>
+                </div>
+                <div class="form-group hidden" id="envGroup">
+                    <label for="envId">Environment</label>
+                    <select id="envId" name="envId" required>
+                        <option value="">-- Select Environment --</option>
+                    </select>
+                </div>
+                <div class="form-group hidden" id="regionGroup">
+                    <label for="region">Region</label>
+                    <select id="region" name="region" required>
+                        <option value="">-- Select Region --</option>
+                    </select>
+                </div>
+                <div class="form-group hidden" id="queueGroup">
+                    <label for="queueName">Queue</label>
+                    <select id="queueName" name="queueName" required>
+                        <option value="">-- Select Queue --</option>
+                    </select>
+                </div>
+                <div class="form-group hidden" id="clientAppGroup">
+                    <label for="clientApp">Client Application</label>
+                    <select id="clientApp" name="clientApp" required>
+                        <option value="">-- Select Client App --</option>
+                    </select>
+                    <small class="form-hint">Client ID will be auto-filled. Secret must be entered manually (not retrievable via API).</small>
+                </div>
+                <div class="form-group hidden" id="clientIdGroup">
+                    <label for="clientId">Client ID</label>
+                    <input type="text" id="clientId" name="clientId" readonly>
+                </div>
+                <div class="form-group hidden" id="clientSecretGroup">
+                    <label for="clientSecret">Client Secret</label>
+                    <input type="password" id="clientSecret" name="clientSecret" placeholder="Enter Client Secret" required>
+                </div>
+                <button type="submit" class="btn btn-primary hidden" id="connect-btn">Connect</button>
+            </form>
+
+            <!-- Manual Mode Form (hidden by default) -->
+            <form id="manual-form" class="connection-form hidden">
+                <div class="form-group">
+                    <label for="m-region">Region</label>
+                    <input type="text" id="m-region" placeholder="e.g. us-east-1" required>
+                </div>
+                <div class="form-group">
+                    <label for="m-orgId">Organization ID</label>
+                    <input type="text" id="m-orgId" placeholder="Enter Org ID" required>
+                </div>
+                <div class="form-group">
+                    <label for="m-envId">Environment ID</label>
+                    <input type="text" id="m-envId" placeholder="Enter Env ID" required>
+                </div>
+                <div class="form-group">
+                    <label for="m-clientId">Client ID</label>
+                    <input type="text" id="m-clientId" placeholder="Enter Client ID" required>
+                </div>
+                <div class="form-group">
+                    <label for="m-clientSecret">Client Secret</label>
+                    <input type="password" id="m-clientSecret" placeholder="Enter Client Secret" required>
+                </div>
+                <div class="form-group">
+                    <label for="m-queueName">Queue Name</label>
+                    <input type="text" id="m-queueName" placeholder="Enter Queue Name" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Connect</button>
+            </form>
+        </div>
+
+        <!-- Messages Page -->
+        <div id="messages-page" class="page">
+            <div class="page-header">
+                <div class="page-header-left">
+                    <button id="back-btn" class="btn btn-icon btn-icon-back" title="Disconnect and return to login">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                    </button>
+                    <img src="logo.svg" alt="" class="logo-sm">
+                    <h1 id="queue-title"></h1>
+                </div>
+                <div class="page-header-right">
+                    <button id="refresh-btn" class="btn btn-icon" title="Refresh - fetch messages from queue again">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M16.5 9.5A5.5 5.5 0 0 0 8 8.5"></path><polyline points="8 5.5 8 8.5 11 8.5"></polyline><path d="M7.5 14.5A5.5 5.5 0 0 0 16 15.5"></path><polyline points="16 18.5 16 15.5 13 15.5"></polyline></svg>
+                    </button>
+                    <button id="return-all-btn" class="btn btn-icon" title="Return all messages to origin queue and disconnect">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                    </button>
+                </div>
+            </div>
+            <div id="loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p id="loading-text">Fetching messages from queue...</p>
+            </div>
+            <div id="error-message" class="error hidden"></div>
+            <div id="bulk-actions" class="bulk-actions hidden">
+                <span id="selected-count">0 selected</span>
+                <button id="bulk-return-btn" class="btn btn-sm btn-return">&#8617; Return Selected to Origin</button>
+                <button id="bulk-transfer-btn" class="btn btn-sm btn-transfer-bulk">&#10132; Transfer Selected to Queue</button>
+                <button id="bulk-delete-btn" class="btn btn-sm btn-danger">&#128465; Delete Selected</button>
+            </div>
+            <div id="messages-table-container" class="messages-table-container hidden">
+                <table class="messages-table">
+                    <thead>
+                        <tr>
+                            <th class="col-checkbox"><input type="checkbox" id="select-all"></th>
+                            <th class="col-id">ID</th>
+                            <th class="col-type">Payload Type</th>
+                            <th class="col-payload">Payload</th>
+                            <th class="col-date">Date Created</th>
+                            <th class="col-actions">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="messages-tbody"></tbody>
+                </table>
+            </div>
+            <div id="pagination" class="pagination hidden">
+                <button id="prev-page" class="btn btn-sm btn-secondary" disabled>&laquo; Previous</button>
+                <span id="page-info">Page 1 of 1</span>
+                <button id="next-page" class="btn btn-sm btn-secondary" disabled>Next &raquo;</button>
+            </div>
+        </div>
+
+        <!-- Message Detail Modal -->
+        <div id="message-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Message Detail</h2>
+                    <button id="close-modal" class="btn-close">&times;</button>
+                </div>
+                <div id="message-detail" class="message-detail"></div>
+            </div>
+        </div>
+
+        <!-- Transfer Queue Modal -->
+        <div id="transfer-modal" class="modal hidden">
+            <div class="modal-content modal-sm">
+                <div class="modal-header">
+                    <h2>Transfer to Queue</h2>
+                    <button id="close-transfer-modal" class="btn-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="info-banner">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        <span>Messages can only be moved between queues in the same region, organization, environment, and business unit.</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="targetQueueName">Target Queue Name</label>
+                        <input type="text" id="targetQueueName" placeholder="Enter target queue name" required>
+                    </div>
+                    <div id="transfer-messages-info" class="transfer-info"></div>
+                    <div class="modal-actions">
+                        <button id="cancel-transfer-btn" class="btn btn-secondary">Cancel</button>
+                        <button id="submit-transfer-btn" class="btn btn-primary">Transfer</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Delete Confirmation Modal -->
+        <div id="delete-modal" class="modal hidden">
+            <div class="modal-content modal-sm">
+                <div class="modal-header">
+                    <h2>Confirm Deletion</h2>
+                    <button id="close-delete-modal" class="btn-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="info-banner info-banner-danger">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                        <span>This action is irreversible. The selected message(s) will be permanently deleted from the Object Store.</span>
+                    </div>
+                    <div id="delete-messages-info" class="transfer-info"></div>
+                    <div class="form-group">
+                        <label for="deleteConfirmInput">Type <strong>DELETE</strong> to confirm</label>
+                        <input type="text" id="deleteConfirmInput" placeholder="Type DELETE here" autocomplete="off">
+                    </div>
+                    <div class="modal-actions">
+                        <button id="cancel-delete-btn" class="btn btn-secondary">Cancel</button>
+                        <button id="submit-delete-btn" class="btn btn-danger" disabled>Delete</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Save Confirmation Modal -->
+        <div id="save-modal" class="modal hidden">
+            <div class="modal-content modal-sm">
+                <div class="modal-header">
+                    <h2>Confirm Save</h2>
+                    <button id="close-save-modal" class="btn-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="info-banner info-banner-danger">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                        <span>This change is irreversible. The original message data cannot be recovered once saved.</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="saveConfirmInput">Type <strong>SAVE</strong> to confirm</label>
+                        <input type="text" id="saveConfirmInput" placeholder="Type SAVE here" autocomplete="off">
+                    </div>
+                    <div class="modal-actions">
+                        <button id="cancel-save-btn" class="btn btn-secondary">Cancel</button>
+                        <button id="submit-save-btn" class="btn btn-primary" disabled>Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Generic Confirm Modal (replaces browser confirm()) -->
+        <div id="confirm-modal" class="modal hidden">
+            <div class="modal-content modal-sm">
+                <div class="modal-header">
+                    <h2 id="confirm-modal-title">Confirm</h2>
+                    <button id="close-confirm-modal" class="btn-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p id="confirm-modal-message"></p>
+                    <div class="modal-actions">
+                        <button id="confirm-modal-cancel" class="btn btn-secondary">Cancel</button>
+                        <button id="confirm-modal-ok" class="btn btn-primary">Confirm</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="toast hidden"></div>
+    </div>
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

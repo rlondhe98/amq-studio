@@ -1,0 +1,75 @@
+{
+  "basicConstraints": 17,
+  "criticalExtensionOIDs": [
+    "sodales",
+    "erat",
+    "erat"
+  ],
+  "extendedKeyUsage": [
+    "ac",
+    "libero",
+    "ipsum"
+  ],
+  "extensions": [
+    {
+      "criticality": true,
+      "oid": "elit"
+    }
+  ],
+  "issuerAlternativeNames": [
+    {
+      "name": "Amy",
+      "type": 86
+    }
+  ],
+  "issuerDN": {
+    "commonName": "convallis",
+    "name": "Dale"
+  },
+  "issuerUniqueID": [
+    true,
+    true,
+    false
+  ],
+  "issuerX500Principal": {
+    "name": "Anabel"
+  },
+  "keyUsage": [
+    true,
+    true
+  ],
+  "name": "Buck",
+  "nonCriticalExtensionOIDs": [
+    "ut",
+    "justo"
+  ],
+  "notAfter": "2025-08-06",
+  "notBefore": "2024-08-26",
+  "publicKey": {
+    "algorithm": "felis",
+    "modulus": 24,
+    "params": 84,
+    "publicKey": "Fusce"
+  },
+  "serialNumber": 67,
+  "serialNumberObject": {
+    "serialNumber": 13
+  },
+  "sigAlgName": "Fusce",
+  "sigAlgOID": "arcu",
+  "subjectAlternativeNames": [
+    {
+      "name": "Akilah",
+      "type": 3
+    }
+  ],
+  "subjectDN": {
+    "commonName": "vitae",
+    "name": "Ahmad"
+  },
+  "subjectX500Principal": {
+    "name": "Adelaida"
+  },
+  "type": "tempor",
+  "version": 94
+}

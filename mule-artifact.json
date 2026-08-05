@@ -1,0 +1,7 @@
+{
+  "name": "amq-studio",
+  "minMuleVersion": "4.9.18",
+  "javaSpecificationVersions": [
+    "17"
+  ]
+}
